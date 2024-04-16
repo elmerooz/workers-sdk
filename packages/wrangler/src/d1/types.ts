@@ -104,3 +104,24 @@ export interface D1QueriesGraphQLResponse {
 		};
 	};
 }
+
+export type ImportInitResponse = {
+	success: true;
+	filename: string;
+	uploadUrl: string;
+};
+export type ImportPollingResponse = {
+	success: true;
+	type: "import";
+	at_bookmark: string;
+	messages: string[];
+	errors: string[];
+} & (
+	| {
+			status: "active" | "error";
+	  }
+	| {
+			status: "complete";
+			result: { filename: string; signedUrl: string };
+	  }
+);
