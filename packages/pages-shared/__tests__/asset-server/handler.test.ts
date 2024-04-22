@@ -605,6 +605,60 @@ describe("asset-server handler", () => {
 			});
 			expect(response3.status).toBe(404);
 		});
+
+		test("preservationCacheV1 (fallback)", async () => {
+			// V1 fallback will stop on this date:
+			if (Date.now() >= new Date("2024-05-10").getTime()) return;
+
+			const deploymentId = "deployment-" + Math.random();
+			const metadata = createMetadataObject({ deploymentId }) as Metadata;
+			const { caches } = createCacheStorage();
+
+			const preservationCacheV1 = await caches.open("assetPreservationCache");
+
+			// Write a response to the V1 cache and make sure it persists
+			await preservationCacheV1.put(
+				"https://example.com/foo",
+				new Response("preserved in V1 cache!", {
+					headers: {
+						"Cache-Control": "public, max-age=300",
+					},
+				})
+			);
+
+			const preservationRes = await preservationCacheV1.match(
+				"https://example.com/foo"
+			);
+
+			if (!preservationRes) {
+				throw new Error(
+					"Did not match preservation cache on https://example.com/foo"
+				);
+			}
+
+			expect(await preservationRes.text()).toMatchInlineSnapshot(
+				`"preserved in V1 cache!"`
+			);
+
+			// Delete the asset from the manifest and ensure it's served from V1 preservation cache
+			const findAssetEntryForPath = async (path: string) => {
+				return null;
+			};
+			const { response, spies } = await getTestResponse({
+				request: new Request("https://example.com/foo"),
+				metadata,
+				findAssetEntryForPath,
+				caches,
+				fetchAsset: () =>
+					Promise.resolve(Object.assign(new Response("hello world!"))),
+			});
+			expect(response.status).toBe(200);
+			expect(await response.text()).toMatchInlineSnapshot(
+				`"preserved in V1 cache!"`
+			);
+			// No cache or early hints writes
+			expect(spies.waitUntil.length).toBe(0);
+		});
 	});
 });
 
