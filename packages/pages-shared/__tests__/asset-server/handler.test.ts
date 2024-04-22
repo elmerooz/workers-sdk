@@ -1,6 +1,6 @@
 import { Cache } from "@miniflare/cache";
 import { MemoryStorage } from "@miniflare/storage-memory";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { generateHandler } from "../../asset-server/handler";
 import { createMetadataObject } from "../../metadata-generator/createMetadataObject";
 import type { HandlerContext } from "../../asset-server/handler";
@@ -539,6 +539,14 @@ describe("asset-server handler", () => {
 	});
 
 	describe("should serve deleted assets from preservation cache", async () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
 		test("preservationCacheV2", async () => {
 			const deploymentId = "deployment-" + Math.random();
 			const metadata = createMetadataObject({ deploymentId }) as Metadata;
@@ -607,8 +615,7 @@ describe("asset-server handler", () => {
 		});
 
 		test("preservationCacheV1 (fallback)", async () => {
-			// V1 fallback will stop on this date:
-			if (Date.now() >= new Date("2024-05-10").getTime()) return;
+			vi.setSystemTime(new Date("2024-05-09")); // 1 day before fallback is disabled
 
 			const deploymentId = "deployment-" + Math.random();
 			const metadata = createMetadataObject({ deploymentId }) as Metadata;
@@ -658,6 +665,20 @@ describe("asset-server handler", () => {
 			);
 			// No cache or early hints writes
 			expect(spies.waitUntil.length).toBe(0);
+
+			// Should disable fallback starting may 10th
+			vi.setSystemTime(new Date("2024-05-10"));
+			const { response: response2, spies: spies2 } = await getTestResponse({
+				request: new Request("https://example.com/foo"),
+				metadata,
+				findAssetEntryForPath,
+				caches,
+				fetchAsset: () =>
+					Promise.resolve(Object.assign(new Response("hello world!"))),
+			});
+			expect(response2.status).toBe(404);
+			// No cache or early hints writes
+			expect(spies2.waitUntil.length).toBe(0);
 		});
 	});
 });
