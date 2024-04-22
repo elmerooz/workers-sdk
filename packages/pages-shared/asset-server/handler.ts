@@ -556,23 +556,21 @@ export async function generateHandler<
 
 							// Check if the asset has changed since last written to cache
 							const match = await assetPreservationCacheV2.match(request);
-							if (match) {
-								if (assetKey !== (await match.text())) {
-									// cache the asset key in the cache with all the headers.
-									// When we read it back, we'll re-fetch the body but use the
-									// cached headers.
-									const preservedResponse = new Response(assetKey, response);
-									preservedResponse.headers.set(
-										"cache-control",
-										CACHE_CONTROL_PRESERVATION
-									);
-									preservedResponse.headers.set("x-robots-tag", "noindex");
+							if (assetKey !== (await match?.text())) {
+								// cache the asset key in the cache with all the headers.
+								// When we read it back, we'll re-fetch the body but use the
+								// cached headers.
+								const preservedResponse = new Response(assetKey, response);
+								preservedResponse.headers.set(
+									"cache-control",
+									CACHE_CONTROL_PRESERVATION
+								);
+								preservedResponse.headers.set("x-robots-tag", "noindex");
 
-									await assetPreservationCacheV2.put(
-										getCacheKey(),
-										preservedResponse
-									);
-								}
+								await assetPreservationCacheV2.put(
+									getCacheKey(),
+									preservedResponse
+								);
 							}
 						} catch (err) {
 							logError(err as Error);

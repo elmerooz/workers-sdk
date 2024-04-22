@@ -539,7 +539,7 @@ describe("asset-server handler", () => {
 	});
 
 	describe("should serve deleted assets from preservation cache", async () => {
-		test("V2", async () => {
+		test("preservationCacheV2", async () => {
 			const deploymentId = "deployment-" + Math.random();
 			const metadata = createMetadataObject({ deploymentId }) as Metadata;
 			const { caches, cacheSpy } = createCacheStorage();
@@ -565,8 +565,8 @@ describe("asset-server handler", () => {
 
 			await Promise.all(spies.waitUntil);
 
-			const preservationCache = cacheSpy["assetPreservationCacheV2"];
-			const preservationRes = await preservationCache.match(
+			const preservationCacheV2 = cacheSpy["assetPreservationCacheV2"];
+			const preservationRes = await preservationCacheV2.match(
 				"https://example.com/foo"
 			);
 
