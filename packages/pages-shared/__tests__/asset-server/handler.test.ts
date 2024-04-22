@@ -472,7 +472,7 @@ describe("asset-server handler", () => {
 		};
 
 		// Create cache storage to reuse between requests
-		const { caches, cacheSpy } = createCacheStorage();
+		const { caches } = createCacheStorage();
 
 		const getResponse = async () =>
 			getTestResponse({
@@ -503,7 +503,7 @@ describe("asset-server handler", () => {
 
 		await Promise.all(spies.waitUntil);
 
-		const earlyHintsCache = cacheSpy[`eh:${deploymentId}`];
+		const earlyHintsCache = await caches.open(`eh:${deploymentId}`);
 		const earlyHintsRes = await earlyHintsCache.match("https://example.com/");
 
 		if (!earlyHintsRes) {
@@ -542,7 +542,7 @@ describe("asset-server handler", () => {
 		test("preservationCacheV2", async () => {
 			const deploymentId = "deployment-" + Math.random();
 			const metadata = createMetadataObject({ deploymentId }) as Metadata;
-			const { caches, cacheSpy } = createCacheStorage();
+			const { caches } = createCacheStorage();
 
 			let findAssetEntryForPath = async (path: string) => {
 				if (path === "/foo.html") {
@@ -565,7 +565,7 @@ describe("asset-server handler", () => {
 
 			await Promise.all(spies.waitUntil);
 
-			const preservationCacheV2 = cacheSpy["assetPreservationCacheV2"];
+			const preservationCacheV2 = await caches.open("assetPreservationCacheV2");
 			const preservationRes = await preservationCacheV2.match(
 				"https://example.com/foo"
 			);
