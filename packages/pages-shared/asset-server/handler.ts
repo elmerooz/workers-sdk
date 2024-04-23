@@ -31,6 +31,12 @@ export const ASSET_PRESERVATION_CACHE_V1 = "assetPreservationCache";
 export const ASSET_PRESERVATION_CACHE_V2 = "assetPreservationCacheV2";
 const CACHE_CONTROL_PRESERVATION = "public, s-maxage=604800"; // 1 week
 
+/** The preservation cache should be periodically
+ * written to so that the age / expiration is reset.
+ * Note: Up to 12 hours of jitter added to this value.
+ */
+export const CACHE_PRESERVATION_WRITE_FREQUENCY = 86_400; // 1 day
+
 export const CACHE_CONTROL_BROWSER = "public, max-age=0, must-revalidate"; // have the browser check in with the server to make sure its local cache is valid before using it
 export const REDIRECTS_VERSION = 1;
 export const HEADERS_VERSION = 2;
@@ -555,8 +561,14 @@ export async function generateHandler<
 							);
 
 							// Check if the asset has changed since last written to cache
+							// or if the cached entry is getting too old and should have
+							// it's expiration reset.
 							const match = await assetPreservationCacheV2.match(request);
-							if (assetKey !== (await match?.text())) {
+							if (
+								!match ||
+								assetKey !== (await match.text()) ||
+								isPreservationCacheResponseExpiring(match)
+							) {
 								// cache the asset key in the cache with all the headers.
 								// When we read it back, we'll re-fetch the body but use the
 								// cached headers.
@@ -728,6 +740,26 @@ function isCacheable(request: Request) {
 function isPreview(url: URL): boolean {
 	if (url.hostname.endsWith(".pages.dev")) {
 		return url.hostname.split(".").length > 3 ? true : false;
+	}
+	return false;
+}
+
+/** Checks if a response is older than CACHE_PRESERVATION_WRITE_FREQUENCY
+ * and should be written to cache again to reset it's expiration.
+ */
+export function isPreservationCacheResponseExpiring(
+	response: Response
+): boolean {
+	const ageHeader = response.headers.get("age");
+	if (!ageHeader) return false;
+	try {
+		const age = parseInt(ageHeader);
+		// Add up to 12 hours of jitter to help prevent a
+		// thundering heard when a lot of assets expire at once.
+		const jitter = Math.floor(Math.random() * 43_200);
+		if (age > CACHE_PRESERVATION_WRITE_FREQUENCY + jitter) return true;
+	} catch {
+		return false;
 	}
 	return false;
 }

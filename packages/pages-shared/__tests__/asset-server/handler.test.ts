@@ -1,7 +1,11 @@
 import { Cache } from "@miniflare/cache";
 import { MemoryStorage } from "@miniflare/storage-memory";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { generateHandler } from "../../asset-server/handler";
+import {
+	CACHE_PRESERVATION_WRITE_FREQUENCY,
+	generateHandler,
+	isPreservationCacheResponseExpiring,
+} from "../../asset-server/handler";
 import { createMetadataObject } from "../../metadata-generator/createMetadataObject";
 import type { HandlerContext } from "../../asset-server/handler";
 import type { Metadata } from "../../asset-server/metadata";
@@ -720,6 +724,54 @@ describe("asset-server handler", () => {
 			`);
 			// No cache or early hints writes
 			expect(spies2.waitUntil.length).toBe(0);
+		});
+	});
+
+	describe("isPreservationCacheResponseExpiring()", async () => {
+		test("no age header", async () => {
+			const res = new Response(null);
+			expect(isPreservationCacheResponseExpiring(res)).toBe(false);
+		});
+
+		test("empty age header", async () => {
+			const res = new Response(null, {
+				headers: { age: "" },
+			});
+			expect(isPreservationCacheResponseExpiring(res)).toBe(false);
+		});
+
+		test("unparsable age header", async () => {
+			const res = new Response(null, {
+				headers: { age: "not-a-number" },
+			});
+			expect(isPreservationCacheResponseExpiring(res)).toBe(false);
+		});
+
+		test("below write frequency", async () => {
+			const res = new Response(null, {
+				headers: { age: "0" },
+			});
+			expect(isPreservationCacheResponseExpiring(res)).toBe(false);
+
+			const res2 = new Response(null, {
+				headers: { age: "5" },
+			});
+			expect(isPreservationCacheResponseExpiring(res2)).toBe(false);
+
+			// At the max age (without jitter)
+			const res3 = new Response(null, {
+				headers: { age: CACHE_PRESERVATION_WRITE_FREQUENCY.toString() },
+			});
+			expect(isPreservationCacheResponseExpiring(res3)).toBe(false);
+		});
+
+		test("above write frequency + jitter", async () => {
+			const res = new Response(null, {
+				headers: {
+					age: (CACHE_PRESERVATION_WRITE_FREQUENCY + 43_200 + 1).toString(),
+				},
+			});
+			expect(isPreservationCacheResponseExpiring(res)).toBe(true);
 		});
 	});
 });
