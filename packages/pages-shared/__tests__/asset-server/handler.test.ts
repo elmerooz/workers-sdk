@@ -568,6 +568,18 @@ describe("asset-server handler", () => {
 			});
 			expect(response.status).toBe(200);
 			expect(await response.text()).toMatchInlineSnapshot('"hello world!"');
+			const expectedHeaders = {
+				"access-control-allow-origin": "*",
+				"cache-control": "public, max-age=0, must-revalidate",
+				"content-type": "undefined",
+				etag: '"asset-key-foo.html"',
+				"referrer-policy": "strict-origin-when-cross-origin",
+				"x-content-type-options": "nosniff",
+				"x-server-env": "dev",
+			};
+			expect(Object.fromEntries(response.headers)).toStrictEqual(
+				expectedHeaders
+			);
 			// waitUntil should be called for asset-preservation,
 			expect(spies.waitUntil.length).toBe(1);
 
@@ -602,6 +614,13 @@ describe("asset-server handler", () => {
 			});
 			expect(response2.status).toBe(200);
 			expect(await response2.text()).toMatchInlineSnapshot('"hello world!"');
+			// Cached responses have the same headers with a few changes/additions:
+			expect(Object.fromEntries(response2.headers)).toStrictEqual({
+				...expectedHeaders,
+				"cache-control": "public, s-maxage=604800",
+				"x-robots-tag": "noindex",
+				"cf-cache-status": "HIT", // new header
+			});
 
 			// Serve with a fresh cache and ensure we don't get a response
 			const { response: response3 } = await getTestResponse({
@@ -612,6 +631,12 @@ describe("asset-server handler", () => {
 					Promise.resolve(Object.assign(new Response("hello world!"))),
 			});
 			expect(response3.status).toBe(404);
+			expect(Object.fromEntries(response3.headers)).toMatchInlineSnapshot(`
+				{
+				  "access-control-allow-origin": "*",
+				  "referrer-policy": "strict-origin-when-cross-origin",
+				}
+			`);
 		});
 
 		test("preservationCacheV1 (fallback)", async () => {
@@ -663,6 +688,16 @@ describe("asset-server handler", () => {
 			expect(await response.text()).toMatchInlineSnapshot(
 				`"preserved in V1 cache!"`
 			);
+			expect(Object.fromEntries(response.headers)).toMatchInlineSnapshot(`
+				{
+				  "access-control-allow-origin": "*",
+				  "cache-control": "public, max-age=300",
+				  "cf-cache-status": "HIT",
+				  "content-type": "text/plain;charset=UTF-8",
+				  "referrer-policy": "strict-origin-when-cross-origin",
+				  "x-content-type-options": "nosniff",
+				}
+			`);
 			// No cache or early hints writes
 			expect(spies.waitUntil.length).toBe(0);
 
@@ -677,6 +712,12 @@ describe("asset-server handler", () => {
 					Promise.resolve(Object.assign(new Response("hello world!"))),
 			});
 			expect(response2.status).toBe(404);
+			expect(Object.fromEntries(response2.headers)).toMatchInlineSnapshot(`
+				{
+				  "access-control-allow-origin": "*",
+				  "referrer-policy": "strict-origin-when-cross-origin",
+				}
+			`);
 			// No cache or early hints writes
 			expect(spies2.waitUntil.length).toBe(0);
 		});
