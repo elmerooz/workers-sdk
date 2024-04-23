@@ -646,12 +646,12 @@ export async function generateHandler<
 					if (setMetrics) {
 						setMetrics({ preservationCacheResult: "checked-hit" });
 					}
+					// Always read the asset key to prevent hanging responses
+					const assetKey = await preservedResponse.text();
 					if (isNullBodyStatus(preservedResponse.status)) {
 						// We know the asset hasn't changed, so use the cached headers.
 						return new Response(null, preservedResponse);
 					}
-
-					const assetKey = await preservedResponse.text();
 					if (assetKey) {
 						const asset = await fetchAsset(assetKey);
 						if (asset) {
